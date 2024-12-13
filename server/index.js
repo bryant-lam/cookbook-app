@@ -4,6 +4,8 @@ import cors from "cors";
 import dotenv from "dotenv";
 import helmet from "helmet";
 import morgan from "morgan";
+import pg from "pg";
+import recipeRoutes from "./routes/recipe.js";
 
 /* CONFIGURATIONS */
 dotenv.config();
@@ -15,4 +17,25 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cors());
 
+/** ROUTES */
+app.use('/recipe', recipeRoutes);
+
+
 /* PostgreSQL SETUP */
+const { Pool } = pg;
+
+const pool = new Pool({
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+});
+
+// Export the pool for use in other parts of the app
+module.exports = {
+  query: (text, params) => pool.query(text, params),
+};
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`server running on port ${PORT}`))
