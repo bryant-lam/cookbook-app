@@ -20,6 +20,14 @@ export const resetSequences = async () => {
   await query(script);
 };
 
+export const insertTestUser = async () => {
+  const res = await query(
+    `INSERT INTO Users (email, password_hash, role) VALUES ($1, $2, $3) RETURNING id`,
+    ['testuser@example.com', 'hashedpassword', 'user']
+  );
+  return res.rows[0].id
+}
+
 // Helper to run queries
 export const query = (text, params) => pool.query(text, params);
 
