@@ -4,9 +4,6 @@ import { query } from "../index.js"
 import { authMiddleware, authorize } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
-router.use(authMiddleware);
-
-
 //! ALL ROUTES ARE SUBJECT TO CHANGE. THIS IS JUST THE SKELETON.
 
 // Public Access: Everyone can see recipes

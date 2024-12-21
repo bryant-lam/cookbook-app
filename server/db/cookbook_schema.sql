@@ -44,7 +44,7 @@ CREATE TABLE Ingredient_Boxes (
     id SERIAL PRIMARY KEY,
     ingredient_id INT REFERENCES Ingredients(id) ON DELETE CASCADE,
     user_id INT REFERENCES Users(id) ON DELETE CASCADE,
-    quantity VARCHAR(50),
+    quantity VARCHAR(50) NOT NULL,
     unit VARCHAR(50),
     UNIQUE(ingredient_id, user_id)
 );

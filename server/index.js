@@ -6,6 +6,7 @@ import helmet from "helmet";
 import morgan from "morgan";
 import pg from "pg";
 import recipeRoutes from "./routes/recipe.js";
+import { authMiddleware } from "./middlewares/authMiddleware.js";
 
 /* CONFIGURATIONS */
 dotenv.config();
@@ -16,6 +17,9 @@ app.use(morgan("common"));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cors());
+
+/** MIDDLEWARE */
+app.use(authMiddleware);
 
 /** ROUTES */
 app.use('/recipe', recipeRoutes);
