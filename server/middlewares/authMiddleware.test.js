@@ -1,61 +1,161 @@
-import { test, expect, beforeAll, afterAll, beforeEach } from "vitest";
-import { resetSequences, query, resetDatabase, closePool, insertTestUser } from "../db/dbTestUtils.js";
+import { test, describe, beforeEach, vi, expect, afterEach, importOriginal } from 'vitest';
+import { authMiddleware, authorize } from './authMiddleware.js';
+import jwt from 'jsonwebtoken';
+import Principal from '../models/Principal.js';
 
-beforeAll(async () => {
-    console.log('Starting database test...');
-    await resetSequences();
+vi.mock('jsonwebtoken');
+
+//! subject to change/remove
+vi.mock('pg', async (importOriginal) => {
+  const actual = await importOriginal('pg');
+  const Pool = vi.fn()
+  const poolInstance = {
+    query: vi.fn(),
+    connect: vi.fn(),
+    end: vi.fn(),
+  };
+
+  Pool.mockReturnValue(poolInstance);
+
+  return { 
+    ...actual,
+    Pool
+  };
 });
 
-beforeEach(async () => {
-    await resetDatabase();
-    await insertTestUser();
-});
 
-afterAll(async () => {
-    await closePool();
-});
+describe('authMiddleware', () => {
+  var req, res, next;
 
-//test is incomplete
-test.todo('should prevent inserting Ingredient_Boxes entries for guest', async () => {
-    const guestRes = await query(
-        `INSERT INTO Users (email, password_hash, role) VALUES ($1, $2, $3) RETURNING *`,
-        ['testguest@example.com', 'hashedpassword', 'guest']
-    );
-
-    const ingredientRes = await query(
-    `INSERT INTO Ingredients (name) VALUES ($1) RETURNING *`,
-    ['Onion']
-    );
-    
-    expect(userRes.rows).toBeDefined();
-    expect(userRes.rows[0].role).toBe("guest");
-    expect(ingredientRes).toBeDefined();
-    expect(ingredientRes.rows[0].name).toBe("Onion")
-    const userId = userRes.rows[0].id;
-    const ingredientId = ingredientRes.rows[0].id;
-
-    // implement middleware role query authorization logic
-    
-});
-
-test.todo('should initialize Principal for a valid token', () => {
-    const req = {
-      headers: {
-        authorization: 'Bearer ' + jwt.sign(
-          { sub: '123', email: 'user@example.com', role: 'user', permissions: ['add:ingredient'] },
-          'test_secret'
-        ),
-      },
+  beforeEach(() => {
+    req = {
+      headers: {},
     };
-    const res = {};
-    const next = vi.fn();
-  
-    process.env.JWT_SECRET = 'test_secret';
-    authMiddleware(req, res, next);
-  
-    expect(req.principal).toBeDefined();
-    expect(req.principal.id).toBe('123');
-    expect(req.principal.email).toBe('user@example.com');
-    expect(req.principal.role).toBe('user');
-    expect(req.principal.hasPermission('add:ingredient')).toBe(true);
+    res = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn(),
+    };
+    next = vi.fn();
   });
+
+
+  test('should return "guest" principal if no token is provided', async () => {
+    await authMiddleware(req, res, next);
+
+    expect(req.principal).toBeInstanceOf(Principal);
+    expect(req.principal.isInRole('guest')).toBe(true);
+    expect(next).toHaveBeenCalled();
+  });
+
+  test('should return 403 for invalid token', async () => {
+    vi.spyOn(jwt, 'verify').mockImplementation(() => {
+      throw new Error('Invalid token');
+    });
+
+    req.headers.authorization = 'Bearer invalid_token';
+
+    await authMiddleware(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({ error: 'Forbidden: Invalid token' });
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  //! Need to fix poolInstance.query.mockResolvedValueOnce. middleware is not using mock queries correctly
+  test('should populate req.principal with valid token', async () => {
+    const { Pool } = await import('pg'); // Ensure you are using the mocked version of Pool
+    const poolInstance = new Pool();
+    const mockClaims = { sub: '123', role: 'user' };
+    const mockUserFromDb = { id: '123', email: 'testuser@example.com', roles: ['user'] };
+    vi.spyOn(jwt, 'verify').mockReturnValue(mockClaims);
+    
+    poolInstance.query.mockResolvedValueOnce({ rows: [mockUserFromDb]});
+
+    req.headers.authorization = 'Bearer valid_token';
+
+    await authMiddleware(req, res, next);
+
+    expect(jwt.verify).toHaveBeenCalledWith('valid_token', process.env.JWT_SECRET);
+    expect(req.user).toEqual(mockClaims);
+    expect(req.principal).toBeInstanceOf(Principal);
+    expect(req.principal.id).toBe(mockClaims.sub);
+    expect(next).toHaveBeenCalled();
+  });
+});
+
+describe.todo('authorize', () => {
+  let req, res, next;
+
+  beforeEach(() => {
+    req = {
+      principal: null,
+    };
+    res = {
+      status: vi.fn().mockReturnThis(),
+      send: vi.fn(),
+    };
+    next = vi.fn();
+  });
+
+  test('should allow user with required permission', () => {
+    const mockPrincipal = {
+      hasPermission: vi.fn().mockReturnValue(true),
+      isInRole: vi.fn().mockReturnValue(false),
+    };
+    req.principal = mockPrincipal;
+
+    const middleware = authorize('read:recipes');
+    middleware(req, res, next);
+
+    expect(mockPrincipal.hasPermission).toHaveBeenCalledWith('read:recipes');
+    expect(next).toHaveBeenCalled();
+    expect(res.status).not.toHaveBeenCalled();
+  });
+
+  test('should return 403 for user without required permission', () => {
+    const mockPrincipal = {
+      hasPermission: vi.fn().mockReturnValue(false),
+      isInRole: vi.fn().mockReturnValue(false),
+    };
+    req.principal = mockPrincipal;
+
+    const middleware = authorize('read:recipes');
+    middleware(req, res, next);
+
+    expect(mockPrincipal.hasPermission).toHaveBeenCalledWith('read:recipes');
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.send).toHaveBeenCalledWith('Forbidden');
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  test('should allow guest user when allowGuest is true', () => {
+    const mockPrincipal = {
+      hasPermission: vi.fn(),
+      isInRole: vi.fn().mockReturnValue(true),
+    };
+    req.principal = mockPrincipal;
+
+    const middleware = authorize('read:recipes', true);
+    middleware(req, res, next);
+
+    expect(mockPrincipal.isInRole).toHaveBeenCalledWith('guest');
+    expect(next).toHaveBeenCalled();
+    expect(res.status).not.toHaveBeenCalled();
+  });
+
+  test('should return 403 for guest user when allowGuest is false', () => {
+    const mockPrincipal = {
+      hasPermission: vi.fn(),
+      isInRole: vi.fn().mockReturnValue(true),
+    };
+    req.principal = mockPrincipal;
+
+    const middleware = authorize('read:recipes', false);
+    middleware(req, res, next);
+
+    expect(mockPrincipal.isInRole).toHaveBeenCalledWith('guest');
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.send).toHaveBeenCalledWith('Forbidden');
+    expect(next).not.toHaveBeenCalled();
+  });
+});

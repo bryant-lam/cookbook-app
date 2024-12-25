@@ -18,10 +18,12 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cors());
 
+/** PUBLIC ROUTES */
+
 /** MIDDLEWARE */
 app.use(authMiddleware);
 
-/** ROUTES */
+/** PRIVATE ROUTES */
 app.use('/recipe', recipeRoutes);
 
 

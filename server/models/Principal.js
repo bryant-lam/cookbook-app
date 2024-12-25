@@ -1,16 +1,19 @@
-export default class Principal {
+class Principal {
     constructor(claims) {
-        this.id = claims.id || null;
-        this.email = claims.email || null;
-        this.role = claims.role || 'guest';
-        this.permissions = claims.permissions || [];
-    }
-
-    hasPermission(permission) {
-        return this.permissions.includes(permission);
+        this.id = claims?.sub || claims?.id || null;
+        this.email = claims?.email || null;
+        this.roles = Array.isArray(claims?.roles) 
+        ? claims?.roles.map((role) => {role.toLowerCase()}) 
+        : [(claims?.roles || 'guest').toLowerCase()];
     }
 
     isInRole(role) {
-        return this.role === role;
+        return this.roles.includes(role.toLowerCase());
+    }
+
+    removeRole(role) {
+        this.roles = this.roles.filter((r) => {r != role.toLowerCase()});
     }
 }
+
+export default Principal;
