@@ -7,6 +7,7 @@ import morgan from "morgan";
 import pg from "pg";
 import recipeRoutes from "./routes/recipe.js";
 import { authMiddleware } from "./middlewares/authMiddleware.js";
+import { query } from "./db/dbTestUtils.js";
 
 /* CONFIGURATIONS */
 dotenv.config();
@@ -21,7 +22,8 @@ app.use(cors());
 /** PUBLIC ROUTES */
 
 /** MIDDLEWARE */
-app.use(authMiddleware);
+const middleware = authMiddleware(query);
+app.use(middleware);
 
 /** PRIVATE ROUTES */
 app.use('/recipe', recipeRoutes);

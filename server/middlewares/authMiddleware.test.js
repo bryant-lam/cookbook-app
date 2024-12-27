@@ -5,27 +5,8 @@ import Principal from '../models/Principal.js';
 
 vi.mock('jsonwebtoken');
 
-//! subject to change/remove
-vi.mock('pg', async (importOriginal) => {
-  const actual = await importOriginal('pg');
-  const Pool = vi.fn()
-  const poolInstance = {
-    query: vi.fn(),
-    connect: vi.fn(),
-    end: vi.fn(),
-  };
-
-  Pool.mockReturnValue(poolInstance);
-
-  return { 
-    ...actual,
-    Pool
-  };
-});
-
-
 describe('authMiddleware', () => {
-  var req, res, next;
+  var req, res, next, mockQuery;
 
   beforeEach(() => {
     req = {
@@ -36,15 +17,19 @@ describe('authMiddleware', () => {
       json: vi.fn(),
     };
     next = vi.fn();
+    mockQuery = vi.fn();
   });
 
 
   test('should return "guest" principal if no token is provided', async () => {
-    await authMiddleware(req, res, next);
+    const middleware = authMiddleware(mockQuery);
+
+    await middleware(req, res, next);
 
     expect(req.principal).toBeInstanceOf(Principal);
     expect(req.principal.isInRole('guest')).toBe(true);
     expect(next).toHaveBeenCalled();
+    expect(mockQuery).not.toHaveBeenCalled();
   });
 
   test('should return 403 for invalid token', async () => {
@@ -54,31 +39,36 @@ describe('authMiddleware', () => {
 
     req.headers.authorization = 'Bearer invalid_token';
 
-    await authMiddleware(req, res, next);
+    const middleware = authMiddleware(mockQuery);
+    await middleware(req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(403);
     expect(res.json).toHaveBeenCalledWith({ error: 'Forbidden: Invalid token' });
     expect(next).not.toHaveBeenCalled();
+    expect(mockQuery).not.toHaveBeenCalled();
   });
 
-  //! Need to fix poolInstance.query.mockResolvedValueOnce. middleware is not using mock queries correctly
   test('should populate req.principal with valid token', async () => {
-    const { Pool } = await import('pg'); // Ensure you are using the mocked version of Pool
-    const poolInstance = new Pool();
     const mockClaims = { sub: '123', role: 'user' };
     const mockUserFromDb = { id: '123', email: 'testuser@example.com', roles: ['user'] };
+    const middleware = authMiddleware(mockQuery);
     vi.spyOn(jwt, 'verify').mockReturnValue(mockClaims);
     
-    poolInstance.query.mockResolvedValueOnce({ rows: [mockUserFromDb]});
+    mockQuery.mockResolvedValueOnce({ rows: [mockUserFromDb]});
 
     req.headers.authorization = 'Bearer valid_token';
 
-    await authMiddleware(req, res, next);
+    await middleware(req, res, next);
 
     expect(jwt.verify).toHaveBeenCalledWith('valid_token', process.env.JWT_SECRET);
+    expect(mockQuery).toHaveBeenCalledWith(
+      `SELECT * FROM Users WHERE id = $1`,
+      [mockClaims.sub]
+    );
     expect(req.user).toEqual(mockClaims);
     expect(req.principal).toBeInstanceOf(Principal);
     expect(req.principal.id).toBe(mockClaims.sub);
+    expect(mockQuery).toHaveBeenCalled();
     expect(next).toHaveBeenCalled();
   });
 });

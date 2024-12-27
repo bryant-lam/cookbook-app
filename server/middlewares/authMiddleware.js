@@ -1,8 +1,7 @@
 import jwt from 'jsonwebtoken';
 import Principal from '../models/Principal.js';
-import { query } from '../db/dbTestUtils.js';
 
-export const authMiddleware = async (req, res, next) => {
+export const authMiddleware = (query) => async (req, res, next) => {
     const token = req.headers.authorization?.split(' ')[1];
     // if not a user, treat them as a guest
     if (!token) {
