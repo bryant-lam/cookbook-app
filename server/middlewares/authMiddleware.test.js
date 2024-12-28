@@ -73,7 +73,7 @@ describe('authMiddleware', () => {
   });
 });
 
-describe.todo('authorize', () => {
+describe('authorize', () => {
   let req, res, next;
 
   beforeEach(() => {
@@ -89,30 +89,27 @@ describe.todo('authorize', () => {
 
   test('should allow user with required permission', () => {
     const mockPrincipal = {
-      hasPermission: vi.fn().mockReturnValue(true),
-      isInRole: vi.fn().mockReturnValue(false),
+      isInRole: vi.fn().mockReturnValue(true),
     };
     req.principal = mockPrincipal;
 
-    const middleware = authorize('read:recipes');
+    const middleware = authorize('user');
     middleware(req, res, next);
 
-    expect(mockPrincipal.hasPermission).toHaveBeenCalledWith('read:recipes');
+    expect(mockPrincipal.isInRole).toHaveBeenCalledWith('user');
     expect(next).toHaveBeenCalled();
     expect(res.status).not.toHaveBeenCalled();
   });
 
   test('should return 403 for user without required permission', () => {
     const mockPrincipal = {
-      hasPermission: vi.fn().mockReturnValue(false),
-      isInRole: vi.fn().mockReturnValue(false),
+      isInRole: vi.fn().mockReturnValue(false)
     };
     req.principal = mockPrincipal;
 
-    const middleware = authorize('read:recipes');
+    const middleware = authorize('user');
     middleware(req, res, next);
 
-    expect(mockPrincipal.hasPermission).toHaveBeenCalledWith('read:recipes');
     expect(res.status).toHaveBeenCalledWith(403);
     expect(res.send).toHaveBeenCalledWith('Forbidden');
     expect(next).not.toHaveBeenCalled();
@@ -120,12 +117,11 @@ describe.todo('authorize', () => {
 
   test('should allow guest user when allowGuest is true', () => {
     const mockPrincipal = {
-      hasPermission: vi.fn(),
       isInRole: vi.fn().mockReturnValue(true),
     };
     req.principal = mockPrincipal;
 
-    const middleware = authorize('read:recipes', true);
+    const middleware = authorize('guest', true);
     middleware(req, res, next);
 
     expect(mockPrincipal.isInRole).toHaveBeenCalledWith('guest');
@@ -135,15 +131,14 @@ describe.todo('authorize', () => {
 
   test('should return 403 for guest user when allowGuest is false', () => {
     const mockPrincipal = {
-      hasPermission: vi.fn(),
-      isInRole: vi.fn().mockReturnValue(true),
+      roles: ['guest'],
+      isInRole: vi.fn().mockReturnValue(false),
     };
     req.principal = mockPrincipal;
 
-    const middleware = authorize('read:recipes', false);
+    const middleware = authorize('user', false);
     middleware(req, res, next);
 
-    expect(mockPrincipal.isInRole).toHaveBeenCalledWith('guest');
     expect(res.status).toHaveBeenCalledWith(403);
     expect(res.send).toHaveBeenCalledWith('Forbidden');
     expect(next).not.toHaveBeenCalled();

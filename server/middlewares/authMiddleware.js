@@ -30,6 +30,7 @@ export const authMiddleware = (query) => async (req, res, next) => {
     }
 }
 
+// user has to be in the same 'role' or allowGuest
 export function authorize(role, allowGuest = false) {
     return (req, res, next) => {
         if (allowGuest && req.principal.isInRole('guest')) {
