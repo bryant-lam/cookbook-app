@@ -6,6 +6,7 @@ import helmet from "helmet";
 import morgan from "morgan";
 import pg from "pg";
 import recipeRoutes from "./routes/recipe.js";
+import tagRoutes from "./routes/tag.js"
 import { authMiddleware } from "./middlewares/authMiddleware.js";
 import { query } from "./db/dbTestUtils.js";
 
@@ -27,6 +28,7 @@ app.use(middleware);
 
 /** PRIVATE ROUTES */
 app.use('/recipe', recipeRoutes);
+app.use('/tag', tagRoutes);
 
 
 /* PostgreSQL SETUP */

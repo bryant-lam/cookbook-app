@@ -1,5 +1,5 @@
 import query from "../index.js";
-
+//! delete this because this app does not need to make direct request to ingredients table
 class Ingredient {
     static async getById(id) {
         const result = await db.query(
