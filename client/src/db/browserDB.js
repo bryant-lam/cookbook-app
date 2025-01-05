@@ -29,3 +29,26 @@ export async function getDB() {
     }
     return null;
 }
+
+/** Tag DB Functions */
+export async function getAllTagsFromLocalStorage() {
+    const db = await getDB();
+    return await db.getAll('Tags');
+}
+
+export async function getRecipesByTagFromLocalStorage(tagName) {
+    const db = await getDB();
+
+    // Find the tag by name
+    const tag = await db.getFromIndex('Tags', 'name', tagName);
+    if (!tag) return [];
+
+    // Get all recipe-tag relationships for the tag
+    const recipeTags = await db.getAllFromIndex('Recipe_Tags', 'tag_id', tag.id);
+
+    // Fetch recipes by IDs
+    const recipeIds = recipeTags.map((rt) => rt.recipe_id);
+    const recipes = await Promise.all(recipeIds.map((id) => db.get('Recipes', id)));
+
+    return recipes;
+}
